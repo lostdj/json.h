@@ -80,15 +80,17 @@ static int json_get_string_size(struct json_parse_state_s* state) {
 
   state->dom_size += sizeof(struct json_string_s);
 
-  if ('"' != state->src[state->offset]) {
-    // expected string to begin with '"'!
+  if ('"' != state->src[state->offset] && '\'' != state->src[state->offset]) {
+    // expected string to begin with '"' or '!
     return 1;
   }
+
+  char q = state->src[state->offset];
 
   // skip leading '"'
   state->offset++;
 
-  while (state->offset < state->size && '"' != state->src[state->offset]) {
+  while (state->offset < state->size && q != state->src[state->offset]) {
     if ('\\' == state->src[state->offset]) {
       // skip reverse solidus character
       state->offset++;
@@ -103,6 +105,7 @@ static int json_get_string_size(struct json_parse_state_s* state) {
         // invalid escaped sequence in string!
         return 1;
       case '"':
+      case '\'':
       case '\\':
       case '/':
       case 'b':
@@ -359,6 +362,7 @@ static int json_get_value_size(struct json_parse_state_s* state) {
 
   switch (state->src[state->offset]) {
   case '"':
+  case '\'':
     return json_get_string_size(state);
   case '{':
     return json_get_object_size(state);
@@ -415,18 +419,22 @@ static int json_parse_string(struct json_parse_state_s* state,
 
   string->string = state->data;
 
-  if ('"' != state->src[state->offset]) {
-    // expected string to begin with '"'!
+  if ('"' != state->src[state->offset] && '\'' != state->src[state->offset]) {
+    // expected string to begin with '"' or '!
     return 1;
   }
+
+  char q = state->src[state->offset];
 
   // skip leading '"'
   state->offset++;
 
   while (state->offset < state->size &&
-    ('"' != state->src[state->offset] ||
+    (q != state->src[state->offset] ||
     ('\\' == state->src[state->offset - 1] &&
-    '"' == state->src[state->offset]))) {
+    '"' == state->src[state->offset]) ||
+    ('\\' == state->src[state->offset - 1] &&
+    '\'' == state->src[state->offset]))) {
     state->data[size++] = state->src[state->offset++];
   }
 
@@ -721,6 +729,7 @@ static int json_parse_value(struct json_parse_state_s* state,
 
   switch (state->src[state->offset]) {
   case '"':
+  case '\'':
     value->type = json_type_string;
     value->payload = state->dom;
     state->dom += sizeof(struct json_string_s);
